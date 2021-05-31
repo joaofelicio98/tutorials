@@ -6,6 +6,7 @@ const bit<16> TYPE_IPV4 = 0x800;
 const bit<8> IP_PROTO_ICMP = 1;
 const bit<8> IP_PROTO_TCP = 6;
 const bit<8> IP_PROTO_UDP = 17;
+const bit<8> IP_PROTO_OPTIMAL = 254;
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -118,7 +119,7 @@ parser MyParser(packet_in packet,
             IP_PROTO_TCP        : parse_tcp;
             IP_PROTO_UDP        : parse_udp;
             IP_PROTO_OPTIMAL    : parse_my_header;
-            default       : accept;
+            default             : accept;
         }
     }
 
