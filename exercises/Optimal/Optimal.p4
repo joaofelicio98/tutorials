@@ -235,7 +235,8 @@ register<bit<32>>(1024) promised_attr; //store promises
 
     //}
 
-    action elect_attribute (bit<16> mcast_id, bit<32> metric) {
+    action elect_attribute (bit<16> mcast_id) {
+        bit<32> m = hdr.my_header.attribute.metric + 1;
         bit<32> hash_index;
         hash(hash_index,
             HashAlgorithm.crc32,
@@ -248,7 +249,7 @@ register<bit<32>>(1024) promised_attr; //store promises
             (bit<32>) 1023);
         bit<32> eid = ((bit<32>) hash_index); //not correct, maybe create a table to associate an ID
 
-        elected_attr.write(eid, metric);
+        elected_attr.write(eid, m);
 
         standard_metadata.mcast_grp = mcast_id;
         is_multicast = true;
