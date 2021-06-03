@@ -66,20 +66,20 @@ header udp_t {
 }
 
 struct attribute {
-    bit<32> metric;
+    bit<32> metric; //hop_count
     bit<32> seq_no;
 }
 
 header my_header_t {
     ip4Addr_t dst_addr;
-    bit<16> next_hop;
-    bit<32> label;
-    bit<32> next_label;
+    //bit<16> next_hop; not sure if it is needed
+    //bit<32> label;
+    //bit<32> next_label;
     attribute attr;
 }
 
 struct metadata {
-    /* empty */
+    bool is_multicast;
 }
 
 struct headers {
@@ -162,9 +162,23 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
+
+register<bit<32>>(1024) elected_attr; //store elected attributes
+register<bit<32>>(1024) promised_attr; //store promises
+
+
+/*****************************Basic Actions*****************************/
+
     action drop() {
         mark_to_drop(standard_metadata);
     }
+
+    action start_myHeader () {
+        hdr.my_header.setValid();
+        hdr.ipv4.ihl = hdr.ipv4.ihl + 1;
+    }
+
+/*********************************************************************/
 
     action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
         standard_metadata.egress_spec = port;
@@ -186,8 +200,81 @@ control MyIngress(inout headers hdr,
         default_action = NoAction();
     }
 
+    // Start a new computation
+    action set_myHeader_mcast (ip4Addr_t dstAddr, bit<16> mcast_id, bit<32> sq_no) {
+        // start my header
+        hdr.my_header.setValid();
+        hdr.ipv4.ihl = hdr.ipv4.ihl + 1;
+        hdr.my_header.attr.metric = 0;
+        hdr.my_header.attr.seq_no = seq_no;
+        hdr.my_header.dst_addr = dstAddr;
+
+        //broadcast this new computation
+        standard_metadata.mcast_grp = mcast_id;
+        is_multicast = true;
+    }
+
+    table tab_initiate_computation {
+        key = {
+            standard_metadata.ingress_port: exact;
+        }
+        actions = {
+            set_myHeader_mcast;
+            drop;
+            NoAction;
+        }
+        size = 1024;
+        default_action = drop();
+    }
+
+    //split into more than one action and do the logic with a controller??
+    // or have some variables in the metadata to indicate if it is to elect,
+    // discard, elect to promise
+    // compare metric, seq_no and decide if it is elected
+    //action decide_attr () {
+
+    //}
+
+    action elect_attribute (bit<16> mcast_id, bit<32> metric) {
+        bit<32> hash_index;
+        hash(hash_index,
+            HashAlgorithm.crc32,
+            (bit<10>) 0,
+            { hdr.ipv4.srcAddr,
+              hdr.ipv4.dstAddr,
+              hdr.ipv4.protocol,
+              hdr.my_header.dstAddr,
+              standard_metadata.ingress_port },
+            (bit<32>) 1023);
+        bit<32> eid = ((bit<32>) hash_index); //not correct, maybe create a table to associate an ID
+
+        elected_attr.write(eid, metric);
+
+        standard_metadata.mcast_grp = mcast_id;
+        is_multicast = true;
+    }
+
+    action elect_promise (bit<32> metric) {
+        bit<32> hash_index;
+        hash(hash_index,
+            HashAlgorithm.crc32,
+            (bit<10>) 0,
+            { hdr.ipv4.srcAddr,
+              hdr.ipv4.dstAddr,
+              hdr.ipv4.protocol,
+              hdr.my_header.dstAddr,
+              standard_metadata.ingress_port },
+            (bit<32>) 1023);
+        bit<32> eid = ((bit<32>) hash_index);
+
+        promised_attr.write(eid, metric);
+        //mark_to_drop(standard_metadata); is it necessary?
+    }
+
+    //CREATE A TABLE
+
     apply {
-        if(hdr.ipv4.isValid()){
+        if(hdr.ipv4.isValid() && !hdr.my_header.isValid()){
             ipv4_lpm.apply();
         }
     }
@@ -200,7 +287,12 @@ control MyIngress(inout headers hdr,
 control MyEgress(inout headers hdr,
                  inout metadata meta,
                  inout standard_metadata_t standard_metadata) {
-    apply {  }
+    apply {
+        /*Make sure that the packet is not replicated to the same port where it was received*/
+        if(meta.is_multicast == true && standard_metadata.ingress_port == standard_metadata.egress_port) {
+            mark_to_drop(standard_metadata);
+        }
+    }
 }
 
 /*************************************************************************
