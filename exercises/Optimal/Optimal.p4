@@ -201,7 +201,7 @@ register<bit<32>>(1024) promised_attr; //store promises
     }
 
     // Start a new computation
-    action set_myHeader_mcast (ip4Addr_t dstAddr, bit<16> mcast_id, bit<32> sq_no) {
+    action set_myHeader_mcast (ip4Addr_t dstAddr, bit<16> mcast_id, bit<32> seq_no) {
         // start my header
         hdr.my_header.setValid();
         hdr.ipv4.ihl = hdr.ipv4.ihl + 1;
@@ -211,7 +211,7 @@ register<bit<32>>(1024) promised_attr; //store promises
 
         //broadcast this new computation
         standard_metadata.mcast_grp = mcast_id;
-        is_multicast = true;
+        meta.is_multicast = true;
     }
 
     table tab_initiate_computation {
@@ -236,7 +236,7 @@ register<bit<32>>(1024) promised_attr; //store promises
     //}
 
     action elect_attribute (bit<16> mcast_id) {
-        bit<32> m = hdr.my_header.attribute.metric + 1;
+        bit<32> m = hdr.my_header.attr.metric + 1;
         bit<32> hash_index;
         hash(hash_index,
             HashAlgorithm.crc32,
@@ -244,7 +244,7 @@ register<bit<32>>(1024) promised_attr; //store promises
             { hdr.ipv4.srcAddr,
               hdr.ipv4.dstAddr,
               hdr.ipv4.protocol,
-              hdr.my_header.dstAddr,
+              hdr.my_header.dst_addr,
               standard_metadata.ingress_port },
             (bit<32>) 1023);
         bit<32> eid = ((bit<32>) hash_index); //not correct, maybe create a table to associate an ID
@@ -252,7 +252,7 @@ register<bit<32>>(1024) promised_attr; //store promises
         elected_attr.write(eid, m);
 
         standard_metadata.mcast_grp = mcast_id;
-        is_multicast = true;
+        meta.is_multicast = true;
     }
 
     action elect_promise (bit<32> metric) {
@@ -263,7 +263,7 @@ register<bit<32>>(1024) promised_attr; //store promises
             { hdr.ipv4.srcAddr,
               hdr.ipv4.dstAddr,
               hdr.ipv4.protocol,
-              hdr.my_header.dstAddr,
+              hdr.my_header.dst_addr,
               standard_metadata.ingress_port },
             (bit<32>) 1023);
         bit<32> eid = ((bit<32>) hash_index);
@@ -332,6 +332,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.icmp);
         packet.emit(hdr.tcp);
         packet.emit(hdr.udp);
+        packet.emit(hdr.my_header);
     }
 }
 
