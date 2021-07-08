@@ -1,3 +1,8 @@
+# Copyright 2019 Belma Turkovic
+# TU Delft Embedded and Networked Systems Group.
+# NOTICE: THIS FILE IS BASED ON https://github.com/p4lang/tutorials/tree/master/exercises/p4runtime, BUT WAS MODIFIED UNDER COMPLIANCE 
+# WITH THE APACHE 2.0 LICENCE FROM THE ORIGINAL WORK. THE FOLLOWING IS THE COPYRIGHT OF THE ORIGINAL DOCUMENT:
+#
 # Copyright 2017-present Open Networking Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,12 +20,12 @@
 from Queue import Queue
 from abc import abstractmethod
 from datetime import datetime
-
+import threading
 import grpc
 from p4.v1 import p4runtime_pb2
 from p4.v1 import p4runtime_pb2_grpc
 from p4.tmp import p4config_pb2
-
+import time
 MSG_LOG_MAX_LEN = 1024
 
 # List of all active connections
@@ -32,8 +37,7 @@ def ShutdownAllSwitchConnections():
 
 class SwitchConnection(object):
 
-    def __init__(self, name=None, address='127.0.0.1:50051', device_id=0,
-                 proto_dump_file=None):
+    def __init__(self, name=None, address='127.0.0.1:50051', device_id=0, proto_dump_file=None):
         self.name = name
         self.address = address
         self.device_id = device_id
@@ -43,7 +47,9 @@ class SwitchConnection(object):
             interceptor = GrpcRequestLogger(proto_dump_file)
             self.channel = grpc.intercept_channel(self.channel, interceptor)
         self.client_stub = p4runtime_pb2_grpc.P4RuntimeStub(self.channel)
+        # create requests queue
         self.requests_stream = IterableQueue()
+        # get response via requests queue
         self.stream_msg_resp = self.client_stub.StreamChannel(iter(self.requests_stream))
         self.proto_dump_file = proto_dump_file
         connections.append(self)
@@ -100,6 +106,30 @@ class SwitchConnection(object):
         else:
             self.client_stub.Write(request)
 
+    def ModifyTableEntry(self, table_entry, dry_run=False):
+        request = p4runtime_pb2.WriteRequest()
+        request.device_id = self.device_id
+        request.election_id.low = 1
+        update = request.updates.add()
+        update.type = p4runtime_pb2.Update.MODIFY
+        update.entity.table_entry.CopyFrom(table_entry)
+        if dry_run:
+            print "P4Runtime Write:", request
+        else:
+            self.client_stub.Write(request)
+
+    def DeleteTableEntry(self, table_entry, dry_run=False):
+        request = p4runtime_pb2.WriteRequest()
+        request.device_id = self.device_id
+        request.election_id.low = 1
+        update = request.updates.add()
+        update.type = p4runtime_pb2.Update.DELETE
+        update.entity.table_entry.CopyFrom(table_entry)
+        if dry_run:
+            print "P4Runtime Write:", request
+        else:
+            self.client_stub.Write(request)
+
     def ReadTableEntries(self, table_id=None, dry_run=False):
         request = p4runtime_pb2.ReadRequest()
         request.device_id = self.device_id
@@ -132,6 +162,22 @@ class SwitchConnection(object):
             for response in self.client_stub.Read(request):
                 yield response
 
+    def PacketIn(self, dry_run=False, **kwargs):
+        for item in self.stream_msg_resp: 
+           if dry_run:
+               print "P4 Runtime PacketIn: ", request 
+           else:
+               return item
+
+    def PacketOut(self, packet, dry_run=False, **kwargs):
+        request = p4runtime_pb2.StreamMessageRequest()
+        request.packet.CopyFrom(packet)
+        if dry_run:
+            print "P4 Runtime: ", request 
+        else:
+            self.requests_stream.put(request)
+            #for item in self.stream_msg_resp:
+            return request
 
     def WritePREEntry(self, pre_entry, dry_run=False):
         request = p4runtime_pb2.WriteRequest()
@@ -145,8 +191,7 @@ class SwitchConnection(object):
         else:
             self.client_stub.Write(request)
 
-class GrpcRequestLogger(grpc.UnaryUnaryClientInterceptor,
-                        grpc.UnaryStreamClientInterceptor):
+class GrpcRequestLogger(grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor):
     """Implementation of a gRPC interceptor that logs request to a file"""
 
     def __init__(self, log_file):

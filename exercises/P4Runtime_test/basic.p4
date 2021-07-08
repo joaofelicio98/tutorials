@@ -146,7 +146,6 @@ control MyIngress(inout headers hdr,
         if (standard_metadata.ingress_port == CPU_PORT) {
             standard_metadata.egress_spec = (egressSpec_t)hdr.cpu_out.egress_spec;
             hdr.cpu_out.setInvalid();
-            exit;
         }
 
         if (hdr.ipv4.isValid()) {
@@ -167,7 +166,6 @@ control MyEgress(inout headers hdr,
         if(standard_metadata.egress_port == CPU_PORT){
             hdr.cpu_in.setValid();
             hdr.cpu_in.ingress_port = (bit<16>)standard_metadata.ingress_port;
-            exit;
          }
      }
 }

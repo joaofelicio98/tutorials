@@ -21,14 +21,25 @@ def writeIpv4Rules(p4info_helper, sw_id, dst_ip_addr, dst_mac_addr, port):
         match_fields={
             "hdr.ipv4.dstAddr": (dst_ip_addr, 32)
         },
-        #action_name="MyIngress.send_to_cpu",
         action_name="MyIngress.ipv4_forward",
         action_params={
-            "dstAddr" = dst_mac_addr
-            "port" = port
+            "dstAddr": dst_mac_addr,
+            "port": port
         })
     sw_id.WriteTableEntry(table_entry)
     print "Installed ingress forwarding rule on %s" % sw_id.name
+
+def sendCPURules(p4info_helper, sw_id, dst_ip_addr):
+    table_entry = p4info_helper.buildTableEntry(
+        table_name="MyIngress.ipv4_lpm",
+        match_fields={
+            "hdr.ipv4.dstAddr": (dst_ip_addr, 32)
+        },
+        action_name="MyIngress.send_to_cpu",
+        action_params={
+        })
+    sw_id.WriteTableEntry(table_entry)
+    print "Installed CPU rule on %s" % sw_id.name
 
 def readTableRules(p4info_helper, sw):
     """
@@ -88,8 +99,11 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
         for i in range(1,3):
             if(i != sw.device_id + 1):
                 writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=2)
+            else:
+                writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=1)
 
-    	#read all table rules
+        sendCPURules(p4info_helper, sw_id=sw, dst_ip_addr="0.0.0.0")
+        #read all table rules
     	readTableRules(p4info_helper, sw)
         while True:
 
