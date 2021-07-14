@@ -96,16 +96,13 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
         print "Installed P4 Program using SetForwardingPipelineConfig on s1"
 
         # Forward all packet to the controller (CPU_PORT 255)
-        #for i in range(1,3):
-        #    if(i != sw.device_id + 1):
-        #        writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=2)
-        #    else:
-        #        writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=1)
+        for i in range(1,3):
+            if(i != sw.device_id + 1):
+                writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=2)
+            else:
+                writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=1)
 
         #sendCPURules(p4info_helper, sw_id=sw, dst_ip_addr="0.0.0.0")
-
-        sendCPURules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.1.1")
-        sendCPURules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.2.2")
 
         #read all table rules
     	readTableRules(p4info_helper, sw)
@@ -115,13 +112,14 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
             if packetin is not None:
             	print "PACKET IN received"
             	print packetin
-            packet = packetin.packet.payload
-            packetout = p4info_helper.buildPacketOut(
-                payload = packet, #send the packet in you received back to output port 3!
-                metadata = {1: "\000\002"} #egress_spec (check @controller_header("packet_out") in the p4 code)
-       	    )
-            print "send PACKET OUT"
-            print sw.PacketOut(packetout)
+                packet = packetin.packet.payload
+                packetout = p4info_helper.buildPacketOut(
+                    payload = packet, #send the packet in you received back to output port 3!
+                    metadata = {1: "\000\002"} #egress_spec (check @controller_header("packet_out") in the p4 code)
+           	    )
+                print "send PACKET OUT"
+                print sw.PacketOut(packetout)
+                packetin = None
 
 
     except KeyboardInterrupt:

@@ -138,7 +138,7 @@ control MyIngress(inout headers hdr,
             NoAction;
         }
         size = 1024;
-        default_action = drop();
+        default_action = send_to_cpu;
     }
 
     apply {
