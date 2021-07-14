@@ -38,6 +38,7 @@ class P4RuntimeSwitch(P4Switch):
                  device_id = None,
                  enable_debugger = False,
                  log_file = None,
+                 cpu_port = None,
                  **kwargs):
         Switch.__init__(self, name, **kwargs)
         assert (sw_path)
@@ -75,6 +76,7 @@ class P4RuntimeSwitch(P4Switch):
         self.output = open(logfile, 'w')
         self.pcap_dump = pcap_dump
         self.enable_debugger = enable_debugger
+        self.cpu_port = cpu_port
         self.log_console = log_console
         if log_file is not None:
             self.log_file = log_file
@@ -120,7 +122,7 @@ class P4RuntimeSwitch(P4Switch):
         if self.thrift_port:
             args.append('--thrift-port ' + str(self.thrift_port))
         if self.grpc_port:
-            args.append("-- --grpc-server-addr 0.0.0.0:" + str(self.grpc_port))
+            args.append("-- --grpc-server-addr 0.0.0.0:" + str(self.grpc_port) + " --cpu-port " + self.cpu_port)
         cmd = ' '.join(args)
         info(cmd + "\n")
 
@@ -134,4 +136,3 @@ class P4RuntimeSwitch(P4Switch):
             error("P4 switch {} did not start correctly.\n".format(self.name))
             exit(1)
         info("P4 switch {} has been started.\n".format(self.name))
-

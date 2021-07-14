@@ -8,8 +8,8 @@
                            "arp -i eth0 -s 10.0.2.20 08:00:00:00:02:00"]}
     },
     "switches": {
-        "s1": { "cpu_port" : true },
-        "s2": { "cpu_port" : true }
+        "s1": { "cpu_port" : 255 },
+        "s2": { "cpu_port" : 255 }
     },
     "links": [
         ["h1", "s1-p1"], ["s1-p2", "s2-p2"], ["h2", "s2-p1"]

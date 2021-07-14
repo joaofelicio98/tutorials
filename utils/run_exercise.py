@@ -150,7 +150,7 @@ class ExerciseRunner:
 
 
     def __init__(self, topo_file, log_dir, pcap_dir,
-                       switch_json, bmv2_exe='simple_switch_grpc', quiet=False):
+                       switch_json, bmv2_exe='simple_switch_grpc', cpu_port='255', quiet=False):
         """ Initializes some attributes and reads the topology json. Does not
             actually run the exercise. Use run_exercise() for that.
 
@@ -182,6 +182,7 @@ class ExerciseRunner:
         self.pcap_dir = pcap_dir
         self.switch_json = switch_json
         self.bmv2_exe = bmv2_exe
+        self.cpu_port = cpu_port
 
 
     def run_exercise(self):
@@ -245,6 +246,7 @@ class ExerciseRunner:
 
         defaultSwitchClass = configureP4Switch(
                                 sw_path=self.bmv2_exe,
+                                cpu_port=self.cpu_port,
                                 json_path=self.switch_json,
                                 log_console=True,
                                 pcap_dump=self.pcap_dir)
@@ -351,6 +353,7 @@ class ExerciseRunner:
             print('corresponding txt file in %s:' % self.log_dir)
             print(' for example run:  cat %s/s1-p4runtime-requests.txt' % self.log_dir)
             print('')
+            print('CPU_PORT: %s' % self.cpu_port)
 
         CLI(self.net)
 
@@ -369,6 +372,7 @@ def get_args():
     parser.add_argument('-j', '--switch_json', type=str, required=False)
     parser.add_argument('-b', '--behavioral-exe', help='Path to behavioral executable',
                                 type=str, required=False, default='simple_switch_grpc')
+    parser.add_argument('-c', '--cpu-port', help='Port to send to the controller', type=str, required = False, default='255')
     return parser.parse_args()
 
 
@@ -378,6 +382,6 @@ if __name__ == '__main__':
 
     args = get_args()
     exercise = ExerciseRunner(args.topo, args.log_dir, args.pcap_dir,
-                              args.switch_json, args.behavioral_exe, args.quiet)
+                              args.switch_json, args.behavioral_exe, args.cpu_port, args.quiet)
 
     exercise.run_exercise()

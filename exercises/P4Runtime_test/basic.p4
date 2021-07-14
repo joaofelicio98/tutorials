@@ -163,7 +163,7 @@ control MyEgress(inout headers hdr,
                  inout standard_metadata_t standard_metadata) {
     apply {
 
-        if(standard_metadata.egress_port == CPU_PORT){
+        if(standard_metadata.egress_port == CPU_PORT){ //packetIN
             hdr.cpu_in.setValid();
             hdr.cpu_in.ingress_port = (bit<16>)standard_metadata.ingress_port;
          }
