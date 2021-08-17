@@ -119,6 +119,7 @@ class ExerciseTopo(Topo):
         return sw_name, sw_port
 
 
+
 class ExerciseRunner:
     """
         Attributes:
@@ -129,6 +130,7 @@ class ExerciseRunner:
             hosts    : dict<string, dict> // mininet host names and their associated properties
             switches : dict<string, dict> // mininet switch names and their associated properties
             links    : list<dict>         // list of mininet link properties
+            veth     : string   // virtual interface read in json file
 
             switch_json : string // json of the compiled p4 example
             bmv2_exe    : string // name or path of the p4 switch binary
@@ -150,7 +152,7 @@ class ExerciseRunner:
 
 
     def __init__(self, topo_file, log_dir, pcap_dir,
-                       switch_json, bmv2_exe='simple_switch_grpc', cpu_port='255', quiet=False):
+                       switch_json, bmv2_exe='simple_switch_grpc', cpu_port='255', quiet=False, veth=None):
         """ Initializes some attributes and reads the topology json. Does not
             actually run the exercise. Use run_exercise() for that.
 
@@ -246,6 +248,7 @@ class ExerciseRunner:
 
         defaultSwitchClass = configureP4Switch(
                                 sw_path=self.bmv2_exe,
+                                switches=self.switches,
                                 cpu_port=self.cpu_port,
                                 json_path=self.switch_json,
                                 log_console=True,
@@ -293,6 +296,7 @@ class ExerciseRunner:
             with open(cli_outfile, 'w') as fout:
                 subprocess.Popen([cli, '--thrift-port', str(thrift_port)],
                                  stdin=fin, stdout=fout)
+
 
     def program_switches(self):
         """ This method will program each switch using the BMv2 CLI and/or
@@ -373,6 +377,7 @@ def get_args():
     parser.add_argument('-b', '--behavioral-exe', help='Path to behavioral executable',
                                 type=str, required=False, default='simple_switch_grpc')
     parser.add_argument('-c', '--cpu-port', help='Port to send to the controller', type=str, required = False, default='255')
+    parser.add_argument('-v', '--veth', help='Virtual interface to communicate with controller', type=str, required=False, default='veth0')
     return parser.parse_args()
 
 

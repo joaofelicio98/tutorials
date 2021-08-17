@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-import sys, os, tempfile, socket
+import sys, os, tempfile, socket, subprocess
 from time import sleep
 
 from mininet.node import Switch
@@ -30,6 +30,7 @@ class P4RuntimeSwitch(P4Switch):
     next_thrift_port = 9090
 
     def __init__(self, name, sw_path = None, json_path = None,
+                 switches = None,
                  grpc_port = None,
                  thrift_port = None,
                  pcap_dump = False,
@@ -39,6 +40,7 @@ class P4RuntimeSwitch(P4Switch):
                  enable_debugger = False,
                  log_file = None,
                  cpu_port = None,
+                 veth = None,
                  **kwargs):
         Switch.__init__(self, name, **kwargs)
         assert (sw_path)
@@ -54,6 +56,11 @@ class P4RuntimeSwitch(P4Switch):
             self.json_path = json_path
         else:
             self.json_path = None
+
+        self.switches = switches
+        for sw_name, sw_dict in self.switches.iteritems():
+            if 'virtual_intf' in sw_dict:
+                self.program_virtual_intf(sw_name, sw_dict)
 
         if grpc_port is not None:
             self.grpc_port = grpc_port
@@ -105,6 +112,8 @@ class P4RuntimeSwitch(P4Switch):
         for port, intf in self.intfs.items():
             if not intf.IP():
                 args.extend(['-i', str(port) + "@" + intf.name])
+        if self.veth:
+            args.extend(['-i' + self.cpu_port + "@" + self.veth])
         if self.pcap_dump:
             args.append("--pcap %s" % self.pcap_dump)
         if self.nanomsg:
@@ -136,3 +145,14 @@ class P4RuntimeSwitch(P4Switch):
             error("P4 switch {} did not start correctly.\n".format(self.name))
             exit(1)
         info("P4 switch {} has been started.\n".format(self.name))
+
+
+    def program_virtual_intf(self, sw_name, sw_dict):
+        """ This method will create the virtual interfaces specified
+            in the json file.
+
+            Notes: It will be used to communicate with the controller
+        """
+        veth = sw_dict['virtual_intf']
+        self.veth = veth
+        subprocess.call(['./', 'veth_setup.sh', veth, sw_name])

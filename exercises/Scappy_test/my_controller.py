@@ -4,6 +4,8 @@ import grpc
 import os
 import sys
 from time import sleep
+import sendPacket
+import receive
 
 # Import P4Runtime lib from parent utils dir
 # Probably there's a better way of doing this.
@@ -95,32 +97,40 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
         sw.SetForwardingPipelineConfig(p4info=p4info_helper.p4info, bmv2_json_file_path=bmv2_file_path)
         print "Installed P4 Program using SetForwardingPipelineConfig on s1"
 
-        # Forward all packet to the controller (CPU_PORT 255)
-        for i in range(1,3):
-            if(i != sw.device_id + 1):
-                writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=2)
-            else:
-                writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0." + str(i) + "." + str(i), dst_mac_addr="08:00:00:00:0"+str(i)+":"+str(i)+str(i), port=1)
+        if(sw.device_id == 0):
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.1.1", dst_mac_addr="08:00:00:00:01:11", port=1)
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.2.2", dst_mac_addr="08:00:00:00:02:22", port=2)
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.3.3", dst_mac_addr="08:00:00:00:03:33", port=3)
+        elif(sw.device_id == 1):
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.1.1", dst_mac_addr="08:00:00:00:01:11", port=2)
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.2.2", dst_mac_addr="08:00:00:00:02:22", port=1)
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.3.3", dst_mac_addr="08:00:00:00:03:33", port=3)
+        else:
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.1.1", dst_mac_addr="08:00:00:00:01:11", port=2)
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.2.2", dst_mac_addr="08:00:00:00:02:22", port=3)
+            writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr="10.0.3.3", dst_mac_addr="08:00:00:00:03:33", port=1)
 
         sendCPURules(p4info_helper, sw_id=sw, dst_ip_addr="0.0.0.0")
 
         #read all table rules
     	readTableRules(p4info_helper, sw)
-        while True:
 
-            packetin = sw.PacketIn()	    #Packet in!
-            if packetin is not None:
-            	print "PACKET IN received"
-            	print packetin
-                packet = packetin.packet.payload
-                packetout = p4info_helper.buildPacketOut(
-                    payload = packet, #send the packet in you received back to output port 3!
-                    metadata = {1: "\000\002"} #egress_spec (check @controller_header("packet_out") in the p4 code)
-           	    )
-                print "send PACKET OUT"
-                print sw.PacketOut(packetout)
-                packetin = None
-                break
+        receive.main(sw.device_id)
+#       while True:
+#
+#            packetin = sw.PacketIn()	    #Packet in!
+#            if packetin is not None:
+#            	print "PACKET IN received"
+#            	print packetin
+#                packet = packetin.packet.payload
+#
+#                packetout = p4info_helper.buildPacketOut(
+#                    payload = packet, #send the packet in you received back to output port 3!
+#                    metadata = {1: "\000\002"} #egress_spec (check @controller_header("packet_out") in the p4 code)
+#           	    )
+#                print "send PACKET OUT"
+#                print sw.PacketOut(packetout)
+#                packetin = None
 
 
     except KeyboardInterrupt:
