@@ -1,6 +1,6 @@
 # Copyright 2019 Belma Turkovic
 # TU Delft Embedded and Networked Systems Group.
-# NOTICE: THIS FILE IS BASED ON https://github.com/p4lang/tutorials/tree/master/exercises/p4runtime, BUT WAS MODIFIED UNDER COMPLIANCE 
+# NOTICE: THIS FILE IS BASED ON https://github.com/p4lang/tutorials/tree/master/exercises/p4runtime, BUT WAS MODIFIED UNDER COMPLIANCE
 # WITH THE APACHE 2.0 LICENCE FROM THE ORIGINAL WORK. THE FOLLOWING IS THE COPYRIGHT OF THE ORIGINAL DOCUMENT:
 #
 # Copyright 2017-present Open Networking Foundation
@@ -140,6 +140,41 @@ class P4InfoHelper(object):
         else:
             raise Exception("Unsupported match type with type %r" % match_type)
 
+    #NOTE: preamble serves as the 'descriptor' for each entity containing its
+    #unique ID, name, alias, annotations and documentation
+
+    #get the controller packet metadata information
+    def get_controller_packet_metadata(self, name=None):
+        type = 'controller_packet_metadata'
+
+        if not hasattr(self.p4info, type):
+            raise AssertionError('ENTITY {} DOES NOT EXIST'.format(type))
+        if name is None:
+            raise AssertionError('No name was provided to {}'.format(type))
+        #preamble.name will specify header type => "packet_in" or "packet_out"
+        for o in getattr(self.p4info, type):
+            pre = o.preamble
+            if pre.name == name:
+                return o
+
+        raise AssertionError('Could not find {} with name {}'.format(type, name))
+
+    #get all parameters in the metadata of controller_packet_metadata
+    def get_controller_packet_metadata_metadata(self, obj, id=None):
+        type = 'metadata'
+
+        if not hasattr(obj, type):
+            raise AssertionError('ENTITY {} DOES NOT EXIST'.format(type))
+        if id is None:
+            raise AssertionError('No ID was provided to {}'.format(type))
+        #looking for a metadata with the given ID
+        for o in getattr(obj,type):
+            if o.id == id:
+                return o
+
+        raise AssertionError('Could not find {} with ID {}'.format(type, id))
+
+
     def get_action_param(self, action_name, name=None, id=None):
         for a in self.p4info.actions:
             pre = a.preamble
@@ -166,15 +201,15 @@ class P4InfoHelper(object):
         p4runtime_param.value = encode(value, p4info_param.bitwidth)
         return p4runtime_param
 
-    # get replicas 
+    # get replicas
     def get_replicas_pb(self, egress_port, instance):
         p4runtime_replicas = p4runtime_pb2.Replica()
         p4runtime_replicas.egress_port = egress_port
         p4runtime_replicas.instance = instance
         return p4runtime_replicas
 
-    # get metadata 
-    def get_metadata_pb(self, metadata_id, value):
+    # get metadata
+    def build_metadata_pb(self, metadata_id, value):
         p4runtime_metadata = p4runtime_pb2.PacketMetadata()
         p4runtime_metadata.metadata_id = metadata_id
         p4runtime_metadata.value = value
@@ -233,4 +268,3 @@ class P4InfoHelper(object):
                     for field_name, value in action_params.iteritems()
                 ])
         return table_entry
-

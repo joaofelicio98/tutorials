@@ -150,7 +150,7 @@ class ExerciseRunner:
 
 
     def __init__(self, topo_file, log_dir, pcap_dir,
-                       switch_json, bmv2_exe='simple_switch_grpc', cpu_port='255', quiet=False):
+                       switch_json, bmv2_exe='simple_switch_grpc', quiet=False):
         """ Initializes some attributes and reads the topology json. Does not
             actually run the exercise. Use run_exercise() for that.
 
@@ -182,7 +182,6 @@ class ExerciseRunner:
         self.pcap_dir = pcap_dir
         self.switch_json = switch_json
         self.bmv2_exe = bmv2_exe
-        self.cpu_port = cpu_port
 
 
     def run_exercise(self):
@@ -191,6 +190,7 @@ class ExerciseRunner:
             initializing the object.
         """
         # Initialize mininet with the topology specified by the config
+        self.program_switches_before()
         self.create_network()
         self.net.start()
         sleep(1)
@@ -294,6 +294,22 @@ class ExerciseRunner:
                 subprocess.Popen([cli, '--thrift-port', str(thrift_port)],
                                  stdin=fin, stdout=fout)
 
+    def program_switch_cpu_port(self, sw_dict):
+        """ This method will define the switche's cpu port with the given
+            port indicated in the json file.
+        """
+        cpu_port = sw_dict['cpu_port']
+        self.cpu_port = cpu_port
+
+    def program_switches_before(self):
+        """ This method will program each switch using a CPU port to
+            communicate with the controller. This must be done before
+            the creation of the network.
+        """
+        for sw_name, sw_dict in self.switches.iteritems():
+            if 'cpu_port' in sw_dict:
+                self.program_switch_cpu_port(sw_dict)
+
     def program_switches(self):
         """ This method will program each switch using the BMv2 CLI and/or
             P4Runtime, depending if any command or runtime JSON files were
@@ -304,6 +320,7 @@ class ExerciseRunner:
                 self.program_switch_cli(sw_name, sw_dict)
             if 'runtime_json' in sw_dict:
                 self.program_switch_p4runtime(sw_name, sw_dict)
+
 
     def program_hosts(self):
         """ Execute any commands provided in the topology.json file on each Mininet host
@@ -372,7 +389,6 @@ def get_args():
     parser.add_argument('-j', '--switch_json', type=str, required=False)
     parser.add_argument('-b', '--behavioral-exe', help='Path to behavioral executable',
                                 type=str, required=False, default='simple_switch_grpc')
-    parser.add_argument('-c', '--cpu-port', help='Port to send to the controller', type=str, required = False, default='255')
     return parser.parse_args()
 
 
@@ -382,6 +398,6 @@ if __name__ == '__main__':
 
     args = get_args()
     exercise = ExerciseRunner(args.topo, args.log_dir, args.pcap_dir,
-                              args.switch_json, args.behavioral_exe, args.cpu_port, args.quiet)
+                              args.switch_json, args.behavioral_exe, args.quiet)
 
     exercise.run_exercise()

@@ -29,11 +29,6 @@ ifdef BMV2_SWITCH_EXE
 run_args += -b $(BMV2_SWITCH_EXE)
 endif
 
-#Set Switch CPU port
-ifdef CPU_PORT
-run_args += -c $(CPU_PORT)
-endif
-
 all: run
 
 run: build

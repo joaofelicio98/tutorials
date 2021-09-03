@@ -1,6 +1,6 @@
 # Copyright 2019 Belma Turkovic
 # TU Delft Embedded and Networked Systems Group.
-# NOTICE: THIS FILE IS BASED ON https://github.com/p4lang/tutorials/tree/master/exercises/p4runtime, BUT WAS MODIFIED UNDER COMPLIANCE 
+# NOTICE: THIS FILE IS BASED ON https://github.com/p4lang/tutorials/tree/master/exercises/p4runtime, BUT WAS MODIFIED UNDER COMPLIANCE
 # WITH THE APACHE 2.0 LICENCE FROM THE ORIGINAL WORK. THE FOLLOWING IS THE COPYRIGHT OF THE ORIGINAL DOCUMENT:
 #
 # Copyright 2017-present Open Networking Foundation
@@ -49,7 +49,7 @@ class SwitchConnection(object):
         self.client_stub = p4runtime_pb2_grpc.P4RuntimeStub(self.channel)
         # create requests queue
         self.requests_stream = IterableQueue()
-        # get response via requests queue
+        # get response via requests queue, returns a StreamMessageResponse
         self.stream_msg_resp = self.client_stub.StreamChannel(iter(self.requests_stream))
         self.proto_dump_file = proto_dump_file
         connections.append(self)
@@ -163,9 +163,9 @@ class SwitchConnection(object):
                 yield response
 
     def PacketIn(self, dry_run=False, **kwargs):
-        for item in self.stream_msg_resp: 
+        for item in self.stream_msg_resp:
            if dry_run:
-               print "P4 Runtime PacketIn: ", request 
+               print "P4 Runtime PacketIn: ", request
            else:
                return item
 
@@ -173,7 +173,7 @@ class SwitchConnection(object):
         request = p4runtime_pb2.StreamMessageRequest()
         request.packet.CopyFrom(packet)
         if dry_run:
-            print "P4 Runtime: ", request 
+            print "P4 Runtime: ", request
         else:
             self.requests_stream.put(request)
             #for item in self.stream_msg_resp:
