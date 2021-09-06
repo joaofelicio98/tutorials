@@ -76,6 +76,8 @@ def printGrpcError(e):
 def main(p4info_file_path, bmv2_file_path, switch_id):
     # Instantiate a P4Runtime helper from the p4info file
     p4info_helper = p4runtime_lib.helper.P4InfoHelper(p4info_file_path)
+    print "{}".format(p4info_file_path)
+    print "{}".format(bmv2_file_path)
 
     try:
         # Create a switch connection object for s1 and s2;
@@ -115,20 +117,17 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
 
                     payload = packetin.packet.payload
                     metadata_list = packetin.packet.metadata
-
                     params = []
 
-                    counter = 1
                     for metadata in metadata_list:
-                        metadata_info = p4info_helper.get_controller_packet_metadata_metadata(
+                        metadata_info = p4info_helper.get_controller_packet_metadata_metadata_info(
                                     obj = packet_in_info, id = metadata.metadata_id)
-                        if counter == 2:
+                        if metadata_info.name == 'dst_addr':
                             value = p4runtime_lib.convert.decodeIPv4(metadata.value)
                         else:
                             value = p4runtime_lib.convert.decodeNum(metadata.value)
                         params.append(value)
                         print'DEBUG: {} has value: {}'.format(metadata_info.name, value)
-                        counter += 1
 
         packetin = None
 

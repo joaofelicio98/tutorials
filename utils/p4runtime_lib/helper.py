@@ -160,7 +160,7 @@ class P4InfoHelper(object):
         raise AssertionError('Could not find {} with name {}'.format(type, name))
 
     #get all parameters in the metadata of controller_packet_metadata
-    def get_controller_packet_metadata_metadata(self, obj, id=None):
+    def get_controller_packet_metadata_metadata_info(self, obj, id=None):
         type = 'metadata'
 
         if not hasattr(obj, type):
