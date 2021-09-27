@@ -24,7 +24,7 @@ class TopologyDB:
         #print "\n"
         self.links = self.parse_links(topo['links'])
         #for link in self.links:
-        #    print "links: NODE1: {} \n ".format(link['node2'][0:2])
+        #    print "links: NODE2: {} \n ".format(link['node2'].rsplit('-')[0])
 
 
     def parse_links(self, unparsed_links):
@@ -60,11 +60,11 @@ class TopologyDB:
 
         neighbors = []
         for link in self.links:
-            if node == link['node1'][0:2] or node == link['node2'][0:2]:
+            if node == link['node1'].rsplit('-')[0] or node == link['node2'].rsplit('-')[0]:
                 if node in link['node1']:
-                    neighbors.append(link['node2'][0:2])
+                    neighbors.append(link['node2'].rsplit('-')[0])
                 else:
-                    neighbors.append(link['node1'][0:2])
+                    neighbors.append(link['node1'].rsplit('-')[0])
 
         return neighbors
 
@@ -74,12 +74,12 @@ class TopologyDB:
 
         neighbors = []
         for link in self.links:
-            if node == link['node1'][0:2] or node == link['node2'][0:2]:
+            if node == link['node1'].rsplit('-')[0] or node == link['node2'].rsplit('-')[0]:
                 if 'h' == link['node1'][0]:
                     if node in link['node1']:
-                        neighbors.append(link['node2'][0:2])
+                        neighbors.append(link['node2'].rsplit('-')[0])
                     else:
-                        neighbors.append(link['node1'][0:2])
+                        neighbors.append(link['node1'].rsplit('-')[0])
         return neighbors
 
     def get_host_ip(self, host):
@@ -101,7 +101,21 @@ class TopologyDB:
         print(self.switches[switch]['cpu_port'])
         return(self.switches[switch]['cpu_port'])
 
+    def get_node_interfaces(self, node):
+        if not node in self.switches:
+            raise AssertionError('There is no switch named {} in this topology.'.format(node))
+
+        link_list = []
+
+        for link in self.links:
+            if link['node1'].rsplit('-')[0] == node and link['node1'].rsplit('p')[1] not in link_list:
+                link_list.append(link['node1'].rsplit('p')[1])
+            elif link['node2'].rsplit('-')[0] == node and link['node2'].rsplit('p')[1] not in link_list:
+                link_list.append(link['node2'].rsplit('p')[1])
+        return link_list
+
 if __name__ == '__main__':
     topo = "topology.json"
     file = "Scappy_test_v2"
     topo = TopologyDB(topo, file)
+    print (topo.get_node_interfaces('s3'))

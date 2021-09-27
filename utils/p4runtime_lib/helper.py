@@ -232,7 +232,7 @@ class P4InfoHelper(object):
         packet_out.payload = payload
         if metadata:
             packet_out.metadata.extend([
-                self.get_metadata_pb(metadata_id, value)
+                self.build_metadata_pb(metadata_id, value)
                 for metadata_id, value in metadata.iteritems()
             ])
         return packet_out
