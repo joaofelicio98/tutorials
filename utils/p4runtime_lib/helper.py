@@ -160,17 +160,21 @@ class P4InfoHelper(object):
         raise AssertionError('Could not find {} with name {}'.format(type, name))
 
     #get all parameters in the metadata of controller_packet_metadata
-    def get_controller_packet_metadata_metadata_info(self, obj, id=None):
+    def get_controller_packet_metadata_metadata_info(self, obj, id=None, name=None):
         type = 'metadata'
 
         if not hasattr(obj, type):
             raise AssertionError('ENTITY {} DOES NOT EXIST'.format(type))
-        if id is None:
-            raise AssertionError('No ID was provided to {}'.format(type))
-        #looking for a metadata with the given ID
+        if id is None and name is None:
+            raise AssertionError('No ID or name was provided to {}'.format(type))
+        #looking for a metadata with the given ID or name
         for o in getattr(obj,type):
-            if o.id == id:
-                return o
+            if id:
+                if o.id == id:
+                    return o
+            if name:
+                if o.name == name:
+                    return o
 
         raise AssertionError('Could not find {} with ID {}'.format(type, id))
 
@@ -230,11 +234,20 @@ class P4InfoHelper(object):
     def buildPacketOut(self, payload, metadata=None):
         packet_out = p4runtime_pb2.PacketOut()
         packet_out.payload = payload
+
         if metadata:
-            packet_out.metadata.extend([
-                self.build_metadata_pb(metadata_id, value)
-                for metadata_id, value in metadata.iteritems()
-            ])
+            header_packet_out_info = self.get_controller_packet_metadata(name='packet_out')
+
+            params = []
+            for name,value in metadata.iteritems():
+                metadata_info = self.get_controller_packet_metadata_metadata_info(
+                    obj=header_packet_out_info,
+                    name=name
+                )
+                value = encode(value,16)
+                params.append(self.build_metadata_pb(metadata_info.id,value))
+
+            packet_out.metadata.extend(params)
         return packet_out
 
     def buildTableEntry(self,

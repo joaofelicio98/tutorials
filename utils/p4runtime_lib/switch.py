@@ -26,6 +26,7 @@ from p4.v1 import p4runtime_pb2
 from p4.v1 import p4runtime_pb2_grpc
 from p4.tmp import p4config_pb2
 import time
+from helper import P4InfoHelper
 MSG_LOG_MAX_LEN = 1024
 
 # List of all active connections
@@ -162,6 +163,7 @@ class SwitchConnection(object):
             for response in self.client_stub.Read(request):
                 yield response
 
+    #receive packet from the switch
     def PacketIn(self, dry_run=False, **kwargs):
         for item in self.stream_msg_resp:
            if dry_run:
@@ -169,6 +171,7 @@ class SwitchConnection(object):
            else:
                return item
 
+    #send packet from the controller
     def PacketOut(self, packet, dry_run=False, **kwargs):
         request = p4runtime_pb2.StreamMessageRequest()
         request.packet.CopyFrom(packet)
