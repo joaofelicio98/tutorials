@@ -68,6 +68,7 @@ class TopologyDB:
 
         return neighbors
 
+#get all nodes's neighbors that are hosts
     def get_hosts_neighbors(self, node):
         if not (node in self.hosts or node in self.switches):
             raise AssertionError('There is no node named {} in this topology.'.format(node))
@@ -101,7 +102,7 @@ class TopologyDB:
         print(self.switches[switch]['cpu_port'])
         return(self.switches[switch]['cpu_port'])
 
-    def get_node_interfaces(self, node):
+    def get_all_node_interfaces(self, node):
         if not node in self.switches:
             raise AssertionError('There is no switch named {} in this topology.'.format(node))
 
@@ -114,8 +115,25 @@ class TopologyDB:
                 link_list.append(link['node2'].rsplit('p')[1])
         return link_list
 
+#This funtion will get the node's interface that connect to the given neighbor
+    def get_node_interface(self, node, neighbor):
+        if not node in self.switches:
+            raise AssertionError('There is no switch named {} in this topology.'.format(node))
+        if not(neighbor in self.switches or neighbor in self.hosts):
+            raise AssertionError('There is no switch or host named {} in this topology'.format(neighbor))
+        devices = self.get_node_neighbors(node)
+        if not neighbor in devices:
+            raise AssertionError('The two given devices are not connected to each other')
+
+        for link in self.links:
+            if node == link['node1'].rsplit('-')[0] and neighbor == link['node2'].rsplit('-')[0]:
+                return link['node1'].rsplit('-')[1].rsplit('p')[1]
+            elif neighbor == link['node1'].rsplit('-')[0] and node == link['node2'].rsplit('-')[0]:
+                return link['node2'].rsplit('-')[1].rsplit('p')[1]
+
+
 if __name__ == '__main__':
     topo = "topology.json"
     file = "Scappy_test_v2"
     topo = TopologyDB(topo, file)
-    print (topo.get_node_interfaces('s3'))
+    print (topo.get_node_interface(node='s1', neighbor='s2'))

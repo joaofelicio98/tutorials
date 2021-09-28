@@ -17,9 +17,11 @@ from p4runtime_lib.switch import ShutdownAllSwitchConnections
 import p4runtime_lib.helper
 import p4runtime_lib.convert
 import utils.topology
+import threading
 
 MY_HEADER_PROTO = 254
-last_seq_no = {} #keep all sequence numbers for every neighbors
+elected_attr = [] #stored elected attributes -> {destination:  [distance,seq_no,por]}
+promised_attr = [] #stored promised attributes -> {destination:  [distance,seq_no,port]}
 
 class My_header(Packet):
     name = 'MyHeader'
@@ -96,6 +98,19 @@ def printGrpcError(e):
     traceback = sys.exc_info()[2]
     print "[%s:%d]" % (traceback.tb_frame.f_code.co_filename, traceback.tb_lineno)
 
+def install_initial_ipv4_rules(p4info_helper, topo_utils, sw, neighbors):
+    for host in neighbors:
+        dst_ip = topo_utils.get_host_ip(host).rsplit('/')[0]
+        dst_mac = topo_utils.get_host_mac(host)
+        port = topo_utils.get_node_interface(sw.name, host)
+        writeIpv4Rules(p4info_helper, sw_id=sw, dst_ip_addr=dst_ip,
+                        dst_mac_addr=dst_mac, port=port)
+
+def install_all_multicast_rules(p4info_helper, topo_utils, sw):
+    intfs = topo_utils.get_all_node_interfaces(sw.name)
+    for intf in intfs:
+        sendBroadcastRules(p4info_helper, sw_id=sw, port=int(intf))
+
 def get_if():
     ifs=get_if_list()
     iface=None # "h1-eth0"
@@ -108,14 +123,13 @@ def get_if():
         exit(1)
     return iface
 
-def startComputation(p4info_helper, topo_utils, sw, dst, port):
+def startComputation(p4info_helper, topo_utils, sw, dst, seq_no, port):
     print "DEBUG: Starting a new computation for destination ", dst
 
     dstAddr = topo_utils.get_host_ip(dst)
     dstAddr = dstAddr.rsplit("/")[0]
 
-    num = last_seq_no[dst]
-    my_header = My_header(dst_addr = dstAddr, distance = 0, seq_no = num)
+    my_header = My_header(dst_addr = dstAddr, distance = 0, seq_no = seq_no)
 
     bind_layers(IP, My_header, proto = MY_HEADER_PROTO)
 
@@ -128,7 +142,7 @@ def startComputation(p4info_helper, topo_utils, sw, dst, port):
     packet = str(packet)
 
     ingress_port = p4runtime_lib.convert.encodeNum(port, 16)
-    meta = {1: ingress_port}
+    meta = {'ingress_port': ingress_port}
     print("METADATA: ", meta)
     packetout = p4info_helper.buildPacketOut(payload = packet, metadata = meta)
 
@@ -137,6 +151,62 @@ def startComputation(p4info_helper, topo_utils, sw, dst, port):
 
     print message
 
+def sendNewComputation(p4info_helper, topo_utils, sw, neighbors, lock):
+    while True:
+        sleep(300) #wait 5 minutes
+        with lock:
+            print "DEBUG: Acquired lock in sendNewComputation"
+            for host in neighbors:
+                host_ip = topo_utils.get_host_ip(host).rsplit('/')[0]
+                list = search_stored_attr(host_ip, "elected")
+                seq_no = list[1] + 1
+                port = list[2]
+                startComputation(p4info_helper, topo_utils, sw, host, seq_no, port)
+            print "DEBUG: Releasing lock in sendNewComputation"
+
+#Returns an elected or promised attribute that corresponds to a given Destination
+#type -> string : "elected" or "promised"
+def search_stored_attr(dst, type):
+    if not(type == "elected" or type == "promised"):
+        raise AssertionError('Type must be elected or promised')
+
+    if type == "elected":
+        for attr in elected_attr:
+            if dst in attr:
+                return attr[dst]
+    else:
+        for attr in promised_attr:
+            if dst in attr:
+                return attr[dst]
+    return None
+
+#This method will update or add a new attribute in the elected or promised attributes
+#type : string -> "elected" or "promised"
+#new : boolean -> True if it is a new destination to add, False if it is to update
+def save_attribute(dst, distance, seq_no, type, new):
+    if not(type == "elected" or type == "promised"):
+        raise AssertionError('Type must be elected or promised')
+    if not(type(new) == bool):
+        raise AssertionError("Parameter new must be type boolean")
+
+    if new:
+        if type == "elected":
+            elected_attr.append({dst:[distance,seq_no]})
+            return
+        else:
+            promised_attr.appen({dst:[distance,seq_no]})
+            return
+    else:
+        if type == "elected"
+            for i in range(len(elected_attr)):
+                if dst in elected_attr[i]:
+                    elected_attr[i][dst] = [distance, seq_no]
+                    return
+        else:
+            for i in range(len(promised_attr)):
+                if dst in promised_attr[i]:
+                    promised_attr[i][dst] = [distance, seq_no]
+                    return
 
 def main(p4info_file_path, bmv2_file_path, switch_id):
     # Instantiate a P4Runtime helper from the p4info file
@@ -163,6 +233,31 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
         sw.SetForwardingPipelineConfig(p4info=p4info_helper.p4info, bmv2_json_file_path=bmv2_file_path)
         print "Installed P4 Program using SetForwardingPipelineConfig on s" + switch_id
 
+        neighbors = topo_utils.get_hosts_neighbors(sw.name)
+
+        #Install IPv4 rules for host neighbors
+        install_initial_ipv4_rules(p4info_helper, topo_utils, sw, neighbors)
+
+
+        #Set CPU Rules
+        sendCPURules(p4info_helper, sw_id=sw, proto=MY_HEADER_PROTO)
+
+        #Set Multicast Rules
+        install_all_multicast_rules(p4info_helper, topo_utils, sw)
+
+        #start first computation
+        for host in neighbors:
+            port = get_node_interface(sw.name, host)
+            startComputation(p4info_helper, topo_utils, sw, host, port)
+
+        #create a lock
+        lock = threading.Lock()
+
+        #create a new thread to start a new computation in x by x seconds
+        thread = threading.Thread(target=sendNewComputation,
+                                  args=(p4p4info_helper, topo_utils, sw, neighbors, lock))
+        thread.start()
+
         #Info about the packets comming from the switch
         #NOTE: the name must be the same as the header in the p4 program
         packet_in_info = p4info_helper.get_controller_packet_metadata(name = 'packet_in')
@@ -170,53 +265,41 @@ def main(p4info_file_path, bmv2_file_path, switch_id):
         #read all table rules
     	#readTableRules(p4info_helper, sw)
 
-        #Set CPU Rules
-        sendCPURules(p4info_helper, sw_id=sw, proto=MY_HEADER_PROTO)
-
-        #Set Multicast Rules
-        intfs = topo_utils.get_node_interfaces(sw.name)
-        for intf in intfs:
-            sendBroadcastRules(p4info_helper, sw_id=sw, port=int(intf))
-
-        neighbors = topo_utils.get_hosts_neighbors(sw.name)
-        for host in neighbors:
-            last_seq_no[host] = 1
-
-        for host in neighbors:
-            startComputation(p4info_helper, topo_utils, sw, host, 1)
-
         while True:
 
-            packetin = sw.PacketIn()	    #Packet in!
-            if packetin is not None:
-                print"ENTERED"
-                update = packetin.WhichOneof('update')
+            with lock:
+                print "DEBUG: Acquired lock in main"
+                packetin = sw.PacketIn()	    #Packet in!
+                if packetin is not None:
+                    print"ENTERED"
+                    update = packetin.WhichOneof('update')
 
-                if update == 'packet':
-                    print 'PACKETIN RECEIVED'
-                    payload = packetin.packet.payload
-                    metadata_list = packetin.packet.metadata
-                    params = []
-                    #print("PAYLOAD: ", payload)
+                    if update == 'packet':
+                        print 'PACKETIN RECEIVED'
+                        payload = packetin.packet.payload
+                        metadata_list = packetin.packet.metadata
+                        params = []
+                        #print("PAYLOAD: ", payload)
 
-                    packet = Ether(payload)
-                    packet.show2()
-                    #header = My_header(packet)
-                    #print "Destination: " + header.dst_addr
-                    #print "Distance: " + header.distance
-                    #print "Sequence number: " + header.seq_no
+                        #packet = Ether(payload)
+                        #packet.show2()
+                        #header = My_header(packet)
+                        #print "Destination: " + header.dst_addr
+                        #print "Distance: " + header.distance
+                        #print "Sequence number: " + header.seq_no
 
-                    for metadata in metadata_list:
-                        metadata_info = p4info_helper.get_controller_packet_metadata_metadata_info(
-                                    obj = packet_in_info, id = metadata.metadata_id)
-                        if metadata_info.name == 'dst_addr':
-                            value = p4runtime_lib.convert.decodeIPv4(metadata.value)
-                        else:
-                            value = p4runtime_lib.convert.decodeNum(metadata.value)
-                        params.append(value)
-                        print'DEBUG: {} has value: {}'.format(metadata_info.name, value)
+                        for metadata in metadata_list:
+                            metadata_info = p4info_helper.get_controller_packet_metadata_metadata_info(
+                                        obj = packet_in_info, id = metadata.metadata_id)
+                            if metadata_info.name == 'dst_addr':
+                                value = p4runtime_lib.convert.decodeIPv4(metadata.value)
+                            else:
+                                value = p4runtime_lib.convert.decodeNum(metadata.value)
+                            params.append(value)
+                            print'DEBUG: {} has value: {}'.format(metadata_info.name, value)
 
-        packetin = None
+                packetin = None
+                print "DEBUG: Releasing lock in main"
 
 
 

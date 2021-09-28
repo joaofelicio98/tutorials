@@ -271,7 +271,7 @@ control MyIngress(inout headers hdr,
             broadcast_elected_attr.apply();
         }
 
-        if (hdr.my_header.isValid()) {
+        else if (hdr.my_header.isValid()) {
             cpu_table.apply();
         }
         else if (hdr.ipv4.isValid()) {
