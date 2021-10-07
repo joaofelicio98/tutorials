@@ -83,21 +83,42 @@ class TopologyDB:
                         neighbors.append(link['node1'].rsplit('-')[0])
         return neighbors
 
+# Get the neighbor that is connected to the given port
+    def get_neighbor_by_port(self, node, port):
+        if not (node in self.hosts or node in self.switches):
+            raise AssertionError('There is no node named {} in this topology.'.format(node))
+
+        port = str(port)
+        for link in self.links:
+            if node == link['node1'].rsplit('-')[0] and port == link['node1'].rsplit('p')[1]:
+                return link['node2'].rsplit('-')[0]
+            elif node == link['node2'].rsplit('-')[0] and port == link['node2'].rsplit('p')[1]:
+                return link['node1'].rsplit('-')[0]
+
+        raise AssertionError('There is no node {} with port {} in this topology'.format(node, port))
+
     def get_host_ip(self, host):
         if not host in self.hosts:
-            raise AssertionError('There is no host named {} in this topology.'.format(node))
+            raise AssertionError('There is no host named {} in this topology.'.format(host))
 
         return self.hosts[host]['ip']
 
     def get_host_mac(self, host):
         if not host in self.hosts:
-            raise AssertionError('There is no host named {} in this topology.'.format(node))
+            raise AssertionError('There is no host named {} in this topology.'.format(host))
 
         return self.hosts[host]['mac']
 
+    def get_switch_mac(self, switch):
+        if not switch in self.switches:
+            raise AssertionError('There is no switch named {} in this topology.'.format(switch))
+
+        neighbors = self.get_hosts_neighbors(switch)
+        return self.hosts[neighbors[0]]['commands'][1][-17:]
+
     def get_switch_cpu_port(self, switch):
-        if not switch in switch in self.switches:
-            raise AssertionError('There is no switch named {} in this topology.'.format(node))
+        if not switch in self.switches:
+            raise AssertionError('There is no switch named {} in this topology.'.format(switch))
 
         print(self.switches[switch]['cpu_port'])
         return(self.switches[switch]['cpu_port'])
@@ -133,7 +154,9 @@ class TopologyDB:
 
 
 if __name__ == '__main__':
+    #testing
     topo = "topology.json"
     file = "Scappy_test_v2"
     topo = TopologyDB(topo, file)
-    print (topo.get_node_interface(node='s1', neighbor='s2'))
+    print (topo.get_neighbor_by_port('s3', 2))
+    print (topo.get_neighbor_by_port('s3', 4))

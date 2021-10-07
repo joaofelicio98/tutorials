@@ -225,9 +225,10 @@ control MyIngress(inout headers hdr,
 
     action send_to_cpu() {
         standard_metadata.egress_spec = CPU_PORT;
+        hdr.my_header.distance = hdr.my_header.distance + 1;
         hdr.packet_in.setValid();
         hdr.packet_in.dst_addr = hdr.my_header.dst_addr;
-        hdr.packet_in.distance = hdr.my_header.distance + 1;
+        hdr.packet_in.distance = hdr.my_header.distance;
         hdr.packet_in.seq_no = hdr.my_header.seq_no;
     }
 
